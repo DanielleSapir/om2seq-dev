@@ -21,6 +21,8 @@ class LocalizerEnum:
 
 
 class LocalizerOutputs(NamedTuple):
+    # equivalent to: 
+    # LocalizerOutputs = collections.namedtuple('LocalizerOutputs', ['label_bg', 'label_stray', 'label_fg', 'loc_output'])
     label_bg: Union[np.ndarray, torch.Tensor]
     label_stray: Union[np.ndarray, torch.Tensor]
     label_fg: Union[np.ndarray, torch.Tensor]
@@ -96,6 +98,7 @@ class DeepOMLocalizer(ImagePreprocessor):
         ])(module_input)
 
     def _inference_forward_pass(self, module_input: np.ndarray):
+        # perform forward pass from DeepOM trained network on input image
         x = Compose([
             SpatialPad(spatial_size=self.config.min_spatial_size, method=Method.END),
             DivisiblePad(k=self.config.divisible_size, method=Method.END)
@@ -110,6 +113,7 @@ class DeepOMLocalizer(ImagePreprocessor):
         return x
 
     def _module_build(self):
+        # build the DeepOM network
         return BasicUNet(
             spatial_dims=1,
             features=tuple(np.stack(self.config.unet_features) // self.config.unet_channel_divider),

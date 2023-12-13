@@ -29,6 +29,7 @@ class Error(PydanticClass):
 
 
 class GenomeDataset(DatasetTask, ParallelTask):
+    # Genome reference dataset
     _task_name = 'genome'
 
     class Config(DatasetTask.Config, ParallelTask.Config):
@@ -97,6 +98,7 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
     class Config(DatasetTask.Config, ParallelTask.Config):
         nominal_scale: float = ENV.NOMINAL_SCALE
         bnx_scale: float = ENV.BNX_SCALE
+        # limit - the dataset size
         limit: int = 100000
 
     def create_dataset(self):

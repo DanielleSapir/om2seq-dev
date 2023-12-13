@@ -12,6 +12,7 @@ from utils.pyutils import NDArray
 
 
 class Orientation(IntEnum):
+    # metadata indicating query reading order
     FORWARD = 0
     REVERSE = 1
 
@@ -25,14 +26,21 @@ class DeepOMAligner:
         limit_ref_len: Optional[int] = None
 
     class Query(PydanticClass):
+        # query_positions - localizations of the pattern within the query
+        # query_scale - TODO
         query_positions: NDArray
         query_scale: float
 
     class QueryToRef(Query):
+        # reference_id - chromosome id? TODO
         reference_id: str = None
         orientation: Orientation
 
     class Alignment(QueryToRef):
+        # score - alignment score based on DeepOM (see paper)
+        # oriented_query - query in original order or reversed based on query orientation
+        # reference_indices - TODO
+        # query_indices: NDArray - TODO
         score: float
         oriented_query: NDArray
         reference_indices: NDArray
@@ -43,6 +51,7 @@ class DeepOMAligner:
         debug(self.config)
 
     def align(self, query: Query, references: dict[str, np.ndarray]) -> Alignment:
+        # computes alignment for each reference and returns the top scoring alignment
         return max((
             self.align_to_ref(
                 query=self.QueryToRef(
@@ -58,6 +67,7 @@ class DeepOMAligner:
         ), key=lambda x: x.score)
 
     def align_to_ref(self, query: QueryToRef, reference: np.ndarray) -> Alignment:
+        # computes alignment for query and specific reference
         if query.orientation == Orientation.FORWARD:
             oriented_query = query.query_positions
         elif query.orientation == Orientation.REVERSE:
@@ -65,10 +75,11 @@ class DeepOMAligner:
         else:
             assert False
 
+        # scaling the query to the reference scale
         query_scaled = oriented_query * query.query_scale
 
-        # send query and reference to the alignment algorithm, and get back the alignment score matrix,
-        #   and matrix of previous indices
+        # send query and reference to the alignment algorithm
+        # get back the alignment score matrix, and matrix of previous indices
         score_matrix, prev_matrix = self.compute_score_matrix(
             qvec=query_scaled,
             rvec=reference,
@@ -77,6 +88,8 @@ class DeepOMAligner:
             skip_q_factor=self.config.skip_q_factor,
             dp_band_size=self.config.dp_band_size,
         )
+        # TODO: QUESTION - if the score matrix is caculated using query_scaled,
+        #  how come query_indices are derived from path.T and then reversed using oriented_query?
 
         # find best score, and the alignment path's endpoint in the alignment matrix
         r0, q0 = np.unravel_index(np.argmax(score_matrix), score_matrix.shape)
@@ -114,6 +127,7 @@ class DeepOMAligner:
             skip_q_factor: float,
             dp_band_size: int
     ):
+        # compute alignment score matrix (see DeepOM paper) and matrix of previous indices
         assert 2 <= len(rvec)
         assert 2 <= len(qvec)
 
