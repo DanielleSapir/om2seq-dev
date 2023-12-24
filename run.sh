@@ -5,9 +5,33 @@ source scripts/gcloud.sh
 source scripts/ssh.sh
 
 #############################################
-# Docker
+# Aliases
 #############################################
 
+alias rt="run-test"
+alias sdr="ssh-docker-run"
+alias s="ssh-cmd"
+alias db="docker-build"
+alias dbp="docker-build-push"
+alias dps="docker-push"
+alias dr="docker-run"
+alias drg="docker-run-gpu"
+alias gs="git status"
+alias ga="git add ."
+alias gc="git commit -am ."
+alias gps="git push"
+alias gpl="git pull"
+alias gcp="gc && gps"
+alias pt="pytest -n 4 -s -v tests"
+alias gc-c2-60="set-c2-60 && gcloud-create"
+alias reload="source ./run.sh"
+alias gccs="gcloud cloud-shell ssh --authorize-session"
+alias rs="run-ssh"
+
+#############################################
+# Docker
+#############################################
+export DOCKER_BUILDKIT=1
 DOCKER_REPO="gcr.io/$GCP_PROJECT_NAME"
 DOCKER_IMAGE_NAME="$DOCKER_REPO/${PROJECT_NAME}:${BRANCH_NAME}"
 DOCKER_RUN_ARGS="--shm-size=16g --rm"
