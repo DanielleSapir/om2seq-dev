@@ -149,7 +149,7 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
         for ref in self.references:
             if ref.startswith(f'NC_0000{xmap_ref_id:02d}'):
                 return ref
-        assert False
+        assert False, f'NC_0000{xmap_ref_id:02d} not found!'
 
     def _bnx_xmap_merged_df(self):
         bnxdf = self.bnx.dataset().to_pandas()
