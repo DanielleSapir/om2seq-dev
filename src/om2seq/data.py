@@ -184,7 +184,7 @@ class TrainingSplit(DatasetTask):
         return AlignedImagesDataset(**dict(self.config)).dataset()
 
     def dataset(self) -> Dataset:
-        df_subset = super().dataset().to_pandas()
+        df_subset = super().dataset().to_pandas() #download or create and upload dataset
         df = self.aligned_dataset().to_pandas()
         assert (df['MoleculeID'] == df_subset['MoleculeID']).all()
         df['subset'] = df_subset['subset']
@@ -226,6 +226,7 @@ class TrainingDataset(data.Dataset, BaseTask):
 
         self.training_split = TrainingSplit(limit=self.config.aligned_limit).dataset_dict()
         self.train_subset = self.training_split['train']
+        # TODO: change aligned_images_dataset to the one I created
         self.crops_eval_dataset = self.generate_crops_dataset(aligned_images_dataset=self.training_split['eval'])
 
     def generate_crops_dataset(self, aligned_images_dataset: Dataset, qry_len: int = None, limit: int = None):

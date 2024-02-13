@@ -59,9 +59,9 @@ class DeepOMAligner:
                     orientation=orientation,
                     reference_id=reference_id
                 ),
-                reference=reference[:self.config.limit_ref_len],
+                reference=reference[:self.config.limit_ref_len], #TODO: QUESTION - why limit_ref_len?
             )
-            for reference_id, reference in references.items()
+            for reference_id, reference in references.items() #this itterates over all chromosomes (under ref_lim)
             if len(reference) >= 2
             for orientation in [Orientation.FORWARD, Orientation.REVERSE]
         ), key=lambda x: x.score)
