@@ -47,6 +47,7 @@ class Benchmark(BaseTask):
         enable_om2seq: bool = True
         enable_deepom: bool = True
         enable_combined: bool = True
+        batch_size: int = 1024 #added to enable inference using different batch sizes (i.e. batch_size=1, for images with different sizes)
 
     config: Config
 
@@ -64,7 +65,7 @@ class Benchmark(BaseTask):
         self.init_om2seq()
 
     def init_om2seq(self):
-        self.inference_model = InferenceModel(model_id_wandb_run_name=self.config.model_id_wandb_run_name)
+        self.inference_model = InferenceModel(**self.config.model_dump())
         self.ref_db = EmbeddingsDB(limit=self.config.ref_emb_limit,
                                    references=self.references,
                                    model_id=self.config.model_id_wandb_run_name,
@@ -213,12 +214,15 @@ class EvalOM2Seq(OMEvaluation):
     config: Config
     inputs: Inputs
 
-    def compute_correctness(self) -> list[bool]:
-        return [self.top_result(_).correct for _ in self.mapping_results()]
+    def compute_correctness(self, query_embeddings=None) -> list[bool]:
+        return [self.top_result(_).correct for _ in self.mapping_results(query_embeddings=query_embeddings)]
 
-    def mapping_results(self) -> list[list[MappingResult]]:
+    def mapping_results(self, query_embeddings=None) -> list[list[MappingResult]]:
         with debug.timer('faiss search'):
-            retrieved = self.retrieve(query_embeddings=self.inference(queries=self.get_crops()))
+            if query_embeddings is not None:
+                retrieved = self.retrieve(query_embeddings=query_embeddings)
+            else:
+                retrieved = self.retrieve(query_embeddings=self.inference(queries=self.get_crops()))
 
         return [
             [
@@ -279,9 +283,11 @@ class EvalDeepOM(OMEvaluation):
         aligner: DeepOMAligner
         references: dict[str, np.ndarray]
 
-    def __init__(self, **kwargs):
+    def __init__(self, dataset=None, **kwargs):
         self.config = self.Config(**kwargs)
-        if hasattr(self, 'Inputs'):
+        if dataset is not None:
+            self.inputs = self.Inputs(crops=dataset, **kwargs)
+        elif hasattr(self, 'Inputs'):
             self.inputs = self.Inputs(**kwargs)
 
     class DeepOMCrop(Cropper.AlignedCrop, AlignedImage, DeepOMLocalizer.LocalizerOutput):
@@ -301,17 +307,19 @@ class EvalDeepOM(OMEvaluation):
             return list(tqdm(results, total=len(inputs), desc=self.compute_correctness.__name__))
 
     def deepom_localize(self, crop: dict):
-        if 'crop_image' in crop.keys():
-            inference = self.inputs.localizer.inference(Cropper.AlignedCrop(**crop).crop_image, preprocess_image=False,
-                                                    extras=True)
-        else:
+        if 'crop_image' not in crop.keys():
             # rounded to int the query and reference start and stop positions
+            # added empty dict entries to match the crop object
             crop = crop | dict(y=None, qry_start=int(crop['QryStartPos']), qry_stop=int(crop['QryEndPos']),\
                                 crop_image=None, pad_amount=0,\
                                 crop_orientation=Orientation[XMAPOrientation(str(crop['Orientation'])).name].value, x=None, crop_ref=None, image_scale=ENV.NOMINAL_SCALE, bin_size=int(ENV.NOMINAL_SCALE),\
                                       ref_start=int(crop['RefStartPos']), ref_stop=int(crop['RefEndPos']))
             inference = self.inputs.localizer.inference(np.array(crop['image']), preprocess_image=False,
                                                     extras=True)
+        elif crop['crop_image'] is not None:
+            inference = self.inputs.localizer.inference(Cropper.AlignedCrop(**crop).crop_image, preprocess_image=False,
+                                                        extras=True)
+        # TODO: this will currently crash if somehow crop_image is None
         return self.DeepOMCrop(**crop, **dict(inference))
 
     def deepom_preprocess(self, dataset=None):
