@@ -227,6 +227,8 @@ class HFModel(PreTrainedModel):
         return encoder(batch.type(DTYPE), attention_mask=attention_mask).last_hidden_state[:, 0]
 
     def _loss(self, similarity: torch.Tensor, target: torch.Tensor):
+        # contrastive loss (see CLIP paper)
+        # logit_scale is a 1/temperature learnt parameter 
         logit_scale = torch.clamp(self.logit_scale, min=0, max=self.trainer_config.logit_scale_max)
         similarity_logits = similarity * logit_scale.exp()
         ce = nn.functional.cross_entropy
@@ -236,6 +238,7 @@ class HFModel(PreTrainedModel):
         ) / 2.0
 
     def similarity(self, x, y):
+        # cosine similarity between x and y (both vectors the length of the batch)
         if self.trainer_config.normalize:
             x = x / x.norm(dim=-1, keepdim=True)
             y = y / y.norm(dim=-1, keepdim=True)

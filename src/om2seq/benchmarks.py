@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from timeit import default_timer
-from typing import Optional
+from typing import Optional, Union, List
 
 import more_itertools
 import numpy as np
@@ -11,6 +11,7 @@ from devtools import debug
 from fire import Fire
 from tqdm import tqdm
 
+from deepom.aligner import Orientation
 from deepom.aligner import DeepOMAligner
 from deepom.localizer import DeepOMLocalizer
 from om2seq.cropping import Cropper
@@ -22,6 +23,7 @@ from om2seq.plotting import CropPlot
 from om2seq.train import Metrics
 from om2seq.data import TrainingDataset, GenomeDataset
 from utils.alignment import AlignmentInfo, AlignedImage
+from utils.xmap_parse import XMAPOrientation
 from utils.dataset_tasks import BaseTask, ParallelTask
 from utils.pyutils import PydanticClassConfig, PydanticClassInputs
 
@@ -45,6 +47,7 @@ class Benchmark(BaseTask):
         enable_om2seq: bool = True
         enable_deepom: bool = True
         enable_combined: bool = True
+        batch_size: int = 1024 #added to enable inference using different batch sizes (i.e. batch_size=1, for images with different sizes)
 
     config: Config
 
@@ -62,7 +65,7 @@ class Benchmark(BaseTask):
         self.init_om2seq()
 
     def init_om2seq(self):
-        self.inference_model = InferenceModel(model_id_wandb_run_name=self.config.model_id_wandb_run_name)
+        self.inference_model = InferenceModel(**self.config.model_dump())
         self.ref_db = EmbeddingsDB(limit=self.config.ref_emb_limit,
                                    references=self.references,
                                    model_id=self.config.model_id_wandb_run_name,
@@ -73,18 +76,20 @@ class Benchmark(BaseTask):
         self.training_dataset = TrainingDataset(references=self.references, add_random_shift=False,
                                                 add_random_flip=False)
 
+    def benchmark_inits(self):
+        self.init_dataset()
+        if self.config.enable_om2seq or self.config.enable_combined:
+            self.init_om2seq()
+        if self.config.enable_deepom or self.config.enable_combined:
+            self.init_deepom()
+
     def benchmark(self):
         with self.wandb_init():
-            self.init_dataset()
-            if self.config.enable_om2seq or self.config.enable_combined:
-                self.init_om2seq()
-
-            if self.config.enable_deepom or self.config.enable_combined:
-                self.init_deepom()
-
+            self.benchmark_inits()
             df = self.compute_metrics()
             wandb.log({'metrics': wandb.Table(dataframe=df)})
             print(df)
+            return df
 
     def init_deepom(self):
         self.localizer = DeepOMLocalizer(device='cuda')
@@ -209,12 +214,15 @@ class EvalOM2Seq(OMEvaluation):
     config: Config
     inputs: Inputs
 
-    def compute_correctness(self) -> list[bool]:
-        return [self.top_result(_).correct for _ in self.mapping_results()]
+    def compute_correctness(self, query_embeddings=None) -> list[bool]:
+        return [self.top_result(_).correct for _ in self.mapping_results(query_embeddings=query_embeddings)]
 
-    def mapping_results(self) -> list[list[MappingResult]]:
+    def mapping_results(self, query_embeddings=None) -> list[list[MappingResult]]:
         with debug.timer('faiss search'):
-            retrieved = self.retrieve(query_embeddings=self.inference(queries=self.get_crops()))
+            if query_embeddings is not None:
+                retrieved = self.retrieve(query_embeddings=query_embeddings)
+            else:
+                retrieved = self.retrieve(query_embeddings=self.inference(queries=self.get_crops()))
 
         return [
             [
@@ -224,8 +232,13 @@ class EvalOM2Seq(OMEvaluation):
             for ref_list in retrieved
         ]
 
-    def retrieve(self, query_embeddings: list[QryEmb]):
-        query_emb_vectors = np.stack([_.qry_emb for _ in query_embeddings])
+    def retrieve(self, query_embeddings: Union[List, List[QryEmb]]):
+        if all(isinstance(item, QryEmb) for item in query_embeddings):
+            print("Received a List[QryEmb]")
+            query_emb_vectors = np.stack([_.qry_emb for _ in query_embeddings])
+        else:
+            print("Received a numpy array of query embeddings")
+            query_emb_vectors = np.stack([_ for _ in query_embeddings])
         search_results = self.search_batch(query_emb_vectors)
         return [
             [
@@ -270,9 +283,11 @@ class EvalDeepOM(OMEvaluation):
         aligner: DeepOMAligner
         references: dict[str, np.ndarray]
 
-    def __init__(self, **kwargs):
+    def __init__(self, dataset=None, **kwargs):
         self.config = self.Config(**kwargs)
-        if hasattr(self, 'Inputs'):
+        if dataset is not None:
+            self.inputs = self.Inputs(crops=dataset, **kwargs)
+        elif hasattr(self, 'Inputs'):
             self.inputs = self.Inputs(**kwargs)
 
     class DeepOMCrop(Cropper.AlignedCrop, AlignedImage, DeepOMLocalizer.LocalizerOutput):
@@ -285,20 +300,34 @@ class EvalDeepOM(OMEvaluation):
 
     config: Config
 
-    def compute_correctness(self) -> list[bool]:
-        inputs = self.deepom_preprocess()
-
+    def compute_correctness(self, dataset=None) -> list[bool]:
+        inputs = self.deepom_preprocess(dataset)
         with ThreadPoolExecutor(max_workers=self.config.num_threads) as executor:
             results = executor.map(lambda _: self.deepom_mapping_result(_).correct, inputs)
             return list(tqdm(results, total=len(inputs), desc=self.compute_correctness.__name__))
 
     def deepom_localize(self, crop: dict):
-        inference = self.inputs.localizer.inference(Cropper.AlignedCrop(**crop).crop_image, preprocess_image=False,
+        if 'crop_image' not in crop.keys():
+            # rounded to int the query and reference start and stop positions
+            # added empty dict entries to match the crop object
+            crop = crop | dict(y=None, qry_start=int(crop['QryStartPos']), qry_stop=int(crop['QryEndPos']),\
+                                crop_image=None, pad_amount=0,\
+                                crop_orientation=Orientation[XMAPOrientation(str(crop['Orientation'])).name].value, x=None, crop_ref=None, image_scale=ENV.NOMINAL_SCALE, bin_size=int(ENV.NOMINAL_SCALE),\
+                                      ref_start=int(crop['RefStartPos']), ref_stop=int(crop['RefEndPos']))
+            inference = self.inputs.localizer.inference(np.array(crop['image']), preprocess_image=False,
                                                     extras=True)
+        elif crop['crop_image'] is not None:
+            inference = self.inputs.localizer.inference(Cropper.AlignedCrop(**crop).crop_image, preprocess_image=False,
+                                                        extras=True)
+        # TODO: this will currently crash if somehow crop_image is None
         return self.DeepOMCrop(**crop, **dict(inference))
 
-    def deepom_preprocess(self):
-        inputs = self.get_crops()
+    def deepom_preprocess(self, dataset=None):
+        # applies the DeepOM localizer on the crops
+        if dataset is None:
+            inputs = self.get_crops()
+        else:
+            inputs = dataset
         with ThreadPoolExecutor(max_workers=1) as executor:
             crops = tqdm(
                 executor.map(self.deepom_localize, inputs),
@@ -310,6 +339,9 @@ class EvalDeepOM(OMEvaluation):
     def deepom_mapping_result(self, crop: DeepOMCrop):
         alignment = self.top_alignment(crop)
         pred_start, pred_stop = AlignmentInfo(**dict(alignment), references=self.inputs.references).ref_lims
+        # if ref_lim is smaller than the dataset given, the GT might not be in the references we are compatring to
+        # and then the code will crash here.
+        # so this is assuming that the reference ids in the test set are included in the references we are comparing to 
         start, stop = AlignmentInfo(**dict(crop), references=self.inputs.references).ref_lims
         overlap = self.segment_overlap(pred_start, pred_stop, start, stop)
 

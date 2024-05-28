@@ -13,7 +13,9 @@ from tqdm import tqdm
 from om2seq.cropping import Cropper
 from utils.wandb_utils import WandbRunData
 from om2seq.train import HFModel
-
+from deepom.aligner import Orientation
+from utils.xmap_parse import XMAPOrientation
+from om2seq.env import ENV
 
 class InferenceModel:
     class Config(PydanticClassConfig):
@@ -53,6 +55,13 @@ class InferenceModel:
 
     def inference_batched(self, items: Iterable[Cropper.AlignedCrop], qry_limit: int = None):
         with torch.inference_mode():
+            if type(items[0]) is not Cropper.AlignedCrop:
+                items = [item | dict(y=item['image'], qry_start=int(item['QryStartPos']), qry_stop=int(item['QryEndPos']),\
+                                crop_image=None, pad_amount=0,\
+                                crop_orientation=Orientation[XMAPOrientation(str(item['Orientation'])).name].value, x=None, crop_ref=None, image_scale=ENV.NOMINAL_SCALE, bin_size=int(ENV.NOMINAL_SCALE),\
+                                      ref_start=int(item['RefStartPos']), ref_stop=int(item['RefEndPos']))
+                                        for item in items]
+
             return [
                 QryEmb(**item, qry_emb=y_emb)
                 for chunk in itertools.islice(more_itertools.chunked(items, self.config.batch_size), qry_limit)

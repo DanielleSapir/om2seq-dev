@@ -18,6 +18,7 @@ class ImagePreprocessor:
         debug(self.config)
 
     def preprocess_image(self, image: np.ndarray):
+        # resize image to wanted width with cropping/padding, adjust intensity and dimentions
         assert image.ndim == 3
         image = image[self.config.image_channel]
 

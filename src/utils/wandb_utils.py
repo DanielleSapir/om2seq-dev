@@ -15,12 +15,20 @@ class WandbRunData:
         debug(wandb_run_name)
         self.api = wandb.Api()
         self.target_path = (Path(ENV.LOCAL_OUT_DIR) / 'wandb-runs' / wandb_run_name).as_posix()
-        self.artifact = self.api.artifact(name=f'ogm/ogm/{artifact_type}-{wandb_run_name}:{artifact_version}',
-                                          type='model')
-        self.artifact.download(self.target_path)
-        self.run_config = dict(self.api.run(f'ogm/ogm/{wandb_run_name}').config)
-        self.state_dict = safetensors.torch.load_file(Path(debug(self.target_path)) / 'model.safetensors')
+        model_file_path = Path(self.target_path) / 'model.safetensors'
+        if model_file_path.exists():
+            # Load the local model
+            self.state_dict = safetensors.torch.load_file(model_file_path)
+            print(f"Loaded local model from {model_file_path}")
+        else:
+            # Load the model from wandb
+            self.artifact = self.api.artifact(name=f'ogm/ogm/{artifact_type}-{wandb_run_name}:{artifact_version}',
+                                              type='model')
+            self.artifact.download(self.target_path)
+            self.state_dict = safetensors.torch.load_file(Path(debug(self.target_path)) / 'model.safetensors')
 
+        self.run_config = dict(self.api.run(f'ogm/ogm/{wandb_run_name}').config)
+    
         trainer_state_json_file = (Path(self.target_path) / 'trainer_state.json')
         if trainer_state_json_file.exists():
             log_history = json.loads(trainer_state_json_file.read_text())["log_history"]

@@ -29,6 +29,7 @@ class Error(PydanticClass):
 
 
 class GenomeDataset(DatasetTask, ParallelTask):
+    # Genome reference dataset
     _task_name = 'genome'
 
     class Config(DatasetTask.Config, ParallelTask.Config):
@@ -97,6 +98,7 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
     class Config(DatasetTask.Config, ParallelTask.Config):
         nominal_scale: float = ENV.NOMINAL_SCALE
         bnx_scale: float = ENV.BNX_SCALE
+        # limit - the dataset size
         limit: int = 100000
 
     def create_dataset(self):
@@ -147,7 +149,7 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
         for ref in self.references:
             if ref.startswith(f'NC_0000{xmap_ref_id:02d}'):
                 return ref
-        assert False
+        assert False, f'NC_0000{xmap_ref_id:02d} not found!'
 
     def _bnx_xmap_merged_df(self):
         bnxdf = self.bnx.dataset().to_pandas()
@@ -182,7 +184,7 @@ class TrainingSplit(DatasetTask):
         return AlignedImagesDataset(**dict(self.config)).dataset()
 
     def dataset(self) -> Dataset:
-        df_subset = super().dataset().to_pandas()
+        df_subset = super().dataset().to_pandas() #download or create and upload dataset
         df = self.aligned_dataset().to_pandas()
         assert (df['MoleculeID'] == df_subset['MoleculeID']).all()
         df['subset'] = df_subset['subset']
@@ -224,6 +226,7 @@ class TrainingDataset(data.Dataset, BaseTask):
 
         self.training_split = TrainingSplit(limit=self.config.aligned_limit).dataset_dict()
         self.train_subset = self.training_split['train']
+        # TODO: change aligned_images_dataset to the one I created
         self.crops_eval_dataset = self.generate_crops_dataset(aligned_images_dataset=self.training_split['eval'])
 
     def generate_crops_dataset(self, aligned_images_dataset: Dataset, qry_len: int = None, limit: int = None):
