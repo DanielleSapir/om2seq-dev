@@ -120,7 +120,7 @@ def main():
     # tds = get_tds()
     # ref_ids = tds[]
     bmk = Benchmark(enable_om2seq=False, enable_deepom=False, enable_combined=True, model_id_wandb_run_name='89fw8ce7'
-                    , num_len=3, ref_limit=None, qry_limit=10, wandb_enabled=False, batch_size=1)
+                    , num_len=3, ref_limit=42, qry_limit=10, wandb_enabled=False, batch_size=1)
     bmk.benchmark_inits()
     test_set = bmk.training_dataset.training_split['test']
     # image_dataset = get_images()

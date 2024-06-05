@@ -22,12 +22,12 @@ class WandbRunData:
             print(f"Loaded local model from {model_file_path}")
         else:
             # Load the model from wandb
-            self.artifact = self.api.artifact(name=f'ogm/ogm/{artifact_type}-{wandb_run_name}:{artifact_version}',
+            self.artifact = self.api.artifact(name=f'ogm-yoyonet/ogm/{artifact_type}-{wandb_run_name}:{artifact_version}',
                                               type='model')
             self.artifact.download(self.target_path)
             self.state_dict = safetensors.torch.load_file(Path(debug(self.target_path)) / 'model.safetensors')
 
-        self.run_config = dict(self.api.run(f'ogm/ogm/{wandb_run_name}').config)
+        self.run_config = dict(self.api.run(f'ogm-yoyonet/ogm/{wandb_run_name}').config)
     
         trainer_state_json_file = (Path(self.target_path) / 'trainer_state.json')
         if trainer_state_json_file.exists():
