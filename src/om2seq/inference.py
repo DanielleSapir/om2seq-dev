@@ -5,6 +5,7 @@ import more_itertools
 import numpy as np
 import torch
 from devtools import debug
+import wandb
 
 from om2seq.mapping import QryEmb
 from utils.pyutils import PydanticClassConfig
@@ -28,9 +29,9 @@ class InferenceModel:
     def __init__(self, **config):
         self.config = self.Config(**config)
         debug(self.config)
-        self.wandb_run_data = WandbRunData(wandb_run_name=self.config.model_id_wandb_run_name)
+        self.wandb_run_data = WandbRunData(wandb_run_name=self.config.model_id_wandb_run_name, wandb_enabled=self.config.wandb_enabled)
         self.model = HFModel(**self.wandb_run_data.run_config)
-        self.model.load_state_dict(self.wandb_run_data.state_dict)
+        print(repr(self.model.load_state_dict(self.wandb_run_data.state_dict, strict=True)))
         self.model.eval()
         self.model.to(self.config.device)
         if self.config.use_data_parallel and self.config.device != 'cpu':

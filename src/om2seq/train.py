@@ -77,7 +77,10 @@ class TrainingTasks(BaseTask):
         model_conv_stride: int = 1
         model_conv_stride_base: int = 1
         conv_stride_multiplier: int = 3
-        model_width_scale: float = .1
+        # load model from local file version - hack dims
+        model_width_scale: float = .072
+        # sweep version - calculate dims
+        # model_width_scale: float = .1
         num_hidden_layers: int = 1
         num_attention_heads: int = 6
 

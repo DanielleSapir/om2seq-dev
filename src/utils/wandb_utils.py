@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+# import yaml
 import pandas as pd
 import safetensors.torch
 import wandb
@@ -11,12 +12,12 @@ from om2seq.env import ENV
 
 
 class WandbRunData:
-    def __init__(self, wandb_run_name: str, artifact_type: str = 'checkpoint', artifact_version: str = 'latest'):
+    def __init__(self, wandb_run_name: str, artifact_type: str = 'checkpoint', artifact_version: str = 'latest', wandb_enabled=True):
         debug(wandb_run_name)
         self.api = wandb.Api()
         self.target_path = (Path(ENV.LOCAL_OUT_DIR) / 'wandb-runs' / wandb_run_name).as_posix()
         model_file_path = Path(self.target_path) / 'model.safetensors'
-        if model_file_path.exists():
+        if model_file_path.exists(): #TODO: check wandb flag
             # Load the local model
             self.state_dict = safetensors.torch.load_file(model_file_path)
             print(f"Loaded local model from {model_file_path}")
@@ -26,8 +27,13 @@ class WandbRunData:
                                               type='model')
             self.artifact.download(self.target_path)
             self.state_dict = safetensors.torch.load_file(Path(debug(self.target_path)) / 'model.safetensors')
+        if wandb_enabled:
+            self.run_config = dict(self.api.run(f'ogm-yoyonet/ogm/{wandb_run_name}').config)
+        else:
+            config_path = model_file_path.with_name('config.json')
+            with open(config_path, 'rb') as f:
+                self.run_config = dict(wandb.util.load_yaml(f))
 
-        self.run_config = dict(self.api.run(f'ogm-yoyonet/ogm/{wandb_run_name}').config)
     
         trainer_state_json_file = (Path(self.target_path) / 'trainer_state.json')
         if trainer_state_json_file.exists():

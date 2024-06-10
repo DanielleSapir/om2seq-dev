@@ -35,9 +35,9 @@ class Env(BaseSettings):
     BNX_FILE: str = BNX_FILES[PATTERN][0]
     XMAP_FILE: str = 'exp_refineFinal1.xmap'
     # human genome - OM2Seq
-    # FASTA_FILE: str = 'GCF_000001405.40_GRCh38.p14_genomic.fna'
+    FASTA_FILE: str = 'GCF_000001405.40_GRCh38.p14_genomic.fna'
     # yiest genome - YOYONet combined with human genome
-    FASTA_FILE: str = 'combined_S288C_reference_sequence_R64-3-1_20210421_and_GCF_000001405.40_GRCh38.p14_genomic.fna'
+    # FASTA_FILE: str = 'combined_S288C_reference_sequence_R64-3-1_20210421_and_GCF_000001405.40_GRCh38.p14_genomic.fna'
     DEEPOM_MODEL_FILE: str = 'src/deepom/deepom.pt'
     BNX_SCALE: float = 375
     NOMINAL_SCALE: float = 320
