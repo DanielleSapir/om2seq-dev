@@ -5,6 +5,7 @@ from typing import Optional, Union, List
 import more_itertools
 import numpy as np
 import pandas as pd
+import torch
 import wandb
 from datasets import Dataset
 from devtools import debug
@@ -92,7 +93,7 @@ class Benchmark(BaseTask):
             return df
 
     def init_deepom(self):
-        self.localizer = DeepOMLocalizer(device='cuda')
+        self.localizer = DeepOMLocalizer(device='cuda' if torch.cuda.is_available() else 'cpu')
         self.aligner = DeepOMAligner()
 
     def generate_crops(self, qry_len: int, limit: int = None):
@@ -216,7 +217,7 @@ class EvalOM2Seq(OMEvaluation):
 
     def compute_correctness(self, query_embeddings=None) -> list[bool]:
         return [self.top_result(_).correct for _ in self.mapping_results(query_embeddings=query_embeddings)]
-
+    
     def mapping_results(self, query_embeddings=None) -> list[list[MappingResult]]:
         with debug.timer('faiss search'):
             if query_embeddings is not None:
@@ -263,6 +264,7 @@ class EvalOM2Seq(OMEvaluation):
             qry=qry,
             ref=ref,
             correct=(ref.reference_id == qry.reference_id) and (overlap > 0),
+            correct_ref_id=(ref.reference_id == qry.reference_id),
             overlap=overlap,
             score=score,
         )
@@ -307,7 +309,8 @@ class EvalDeepOM(OMEvaluation):
             return list(tqdm(results, total=len(inputs), desc=self.compute_correctness.__name__))
 
     def deepom_localize(self, crop: dict):
-        if 'crop_image' not in crop.keys():
+        # TODO: find the difference between the two conditions crop_image is None
+        if 'crop_image' not in crop.keys() or crop['crop_image'] == None:
             # rounded to int the query and reference start and stop positions
             # added empty dict entries to match the crop object
             crop = crop | dict(y=None, qry_start=int(crop['QryStartPos']), qry_stop=int(crop['QryEndPos']),\
@@ -316,10 +319,11 @@ class EvalDeepOM(OMEvaluation):
                                       ref_start=int(crop['RefStartPos']), ref_stop=int(crop['RefEndPos']))
             inference = self.inputs.localizer.inference(np.array(crop['image']), preprocess_image=False,
                                                     extras=True)
+        
+
         elif crop['crop_image'] is not None:
             inference = self.inputs.localizer.inference(Cropper.AlignedCrop(**crop).crop_image, preprocess_image=False,
                                                         extras=True)
-        # TODO: this will currently crash if somehow crop_image is None
         return self.DeepOMCrop(**crop, **dict(inference))
 
     def deepom_preprocess(self, dataset=None):

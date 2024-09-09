@@ -1,15 +1,19 @@
-from typing import TextIO
+from typing import Optional, TextIO
 
 import more_itertools
 import numpy as np
 import pandas as pd
+from pydantic import root_validator
 from utils.pyutils import PydanticClass, PydanticClassConfig, PydanticClassInputs
 
 from utils.pyutils import NDArray
 
 
 class BNXParser:
+    # OM2Seq
     LINES_PER_RECORD = 7
+    # YoyoNet
+    # LINES_PER_RECORD = 4
     RUN_DATA = "# Run Data"
 
     class BNXRun(PydanticClass):
@@ -22,15 +26,31 @@ class BNXParser:
         BasesPerPixel: str
         NumberofScans: int
         ChipId: str
-        FlowCell: str
-        SNRFilterType: str
+        FlowCell: Optional[str]
+        #Flowcell: Optional[str]
+        SNRFilterType: Optional[str]
+        #LabelSNRFilterType: Optional[str]
         MinMoleculeLength: float
         MinLabelSNR1: float
-        MinLabelSNR2: float
+        MinLabelSNR2: Optional[float] = None
 
         Scan: str = None
         Bank: str = None
         Cohort: str = None
+
+        @root_validator(pre=True)
+        def handle_aliases(cls, values):
+            # Map possible field names to the canonical field name
+            field_aliases = {
+                'FlowCell': 'FlowCell',
+                'Flowcell': 'FlowCell',
+                'SNRFilterType': 'SNRFilterType',
+                'LabelSNRFilterType': 'SNRFilterType'
+            }
+            for alias, canonical_name in field_aliases.items():
+                if alias in values:
+                    values[canonical_name] = values.pop(alias)
+            return values
 
     class BNXRecord(PydanticClass):
         BNXLocalizations: NDArray
@@ -43,10 +63,11 @@ class BNXParser:
         EndX: int
         EndY: int
         Flowcell: str
-        GlobalScanNumber: int
+        GlobalScanNumber: Optional[int] = None
         LabelChannel: int
         Length: float
-        MoleculeID: int
+        MoleculeID: int = None
+        #MoleculeId: int = None
         NumberofLabels: int
         OriginalMoleculeId: int
         RunId: str
@@ -56,6 +77,18 @@ class BNXParser:
         StartFOV: int
         StartX: int
         StartY: int
+
+        @root_validator(pre=True)
+        def handle_aliases(cls, values):
+            # Map possible field names to the canonical field name
+            field_aliases = {
+                'MoleculeID': 'MoleculeID',
+                'MoleculeId': 'MoleculeID'
+            }
+            for alias, canonical_name in field_aliases.items():
+                if alias in values:
+                    values[canonical_name] = values.pop(alias)
+            return values
 
     def parse_record(self, record: list[str]):
         metadata, data = [line.strip().split() for line in record[:2]]

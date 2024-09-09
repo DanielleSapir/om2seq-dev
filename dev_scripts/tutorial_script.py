@@ -112,6 +112,23 @@ def add_overlap_column(df, ref_stops, ref_starts):
 
     df['overlap'] = stop_min - start_max
 
+def show_images_grid(image_list):
+    if len(image_list) != 50:
+        raise ValueError("The list must contain exactly 50 images.")
+    
+    rows, cols = 10, 5  # 10 rows, 5 columns
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 30))
+    axes = axes.flatten()
+
+    for idx, (ax, image) in enumerate(zip(axes, image_list)):
+        ax.imshow(image, cmap='gray')
+        ax.set_title(f"Index {idx}")
+        ax.axis('on')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.tight_layout()
+    plt.show()
 
 def main():
     # tds, image_dataset, training_image_ds, ref_starts, ref_stops, ref_ids = history()
@@ -119,10 +136,10 @@ def main():
     # test_set_first_100 = get_tid()
     # tds = get_tds()
     # ref_ids = tds[]
-    bmk = Benchmark(enable_om2seq=False, enable_deepom=False, enable_combined=True, model_id_wandb_run_name='89fw8ce7'
-                    , num_len=3, ref_limit=None, qry_limit=10, wandb_enabled=False, batch_size=1)
+    bmk = Benchmark(enable_om2seq=True, enable_deepom=False, enable_combined=True, model_id_wandb_run_name='89fw8ce7'
+                    , num_len=3, ref_limit=None, qry_limit=10, wandb_enabled=False, batch_size=1, num_threads=1, max_workers=0)
     bmk.benchmark_inits()
-    test_set = bmk.training_dataset.training_split['test']
+    test_set = bmk.training_dataset.training_split['train']
     # image_dataset = get_images()
     image_dataset = test_set['image']
     ref_ids = test_set['reference_id']
@@ -133,11 +150,22 @@ def main():
     # print('DeepOM Evaluation:\nnum correct: ', sum(res),'out of ', len(res), '\naccuracy:', sum(res)/len(res))
 
     # OM2Seq evaluation
-    #image_embs = np.squeeze(inference(image_dataset), axis=1)
-    # ev = EvalOM2Seq(inference_model=bmk.inference_model,ref_emb_ds=bmk.ref_emb_ds)
-    # image_embs = ev.inference(test_set)
-    # metrics = ev.compute_correctness(query_embeddings=image_embs)
-    # df = pd.DataFrame(metrics)
+    # image_embs = np.squeeze(inference(image_dataset), axis=1)
+    ev = EvalOM2Seq(inference_model=bmk.inference_model,ref_emb_ds=bmk.ref_emb_ds)
+    image_embs = ev.inference(test_set)
+    metrics = ev.compute_correctness(query_embeddings=image_embs)
+    df = pd.DataFrame(metrics)
+    df.columns = ['correct']
+    mapping_res = ev.mapping_results(query_embeddings=image_embs)
+    correct_id = pd.DataFrame([ev.top_result(_).correct_ref_id for _ in mapping_res])
+    correct_id.columns = ['correct_id']    
+    ds_df = pd.DataFrame(test_set).join(df['correct'])
+    ds_df = ds_df.join(correct_id['correct_id'])
+    correct_num = ds_df['correct'].value_counts()[True]
+    print('OM2Seq Evaluation:\nnum correct:\n', correct_num ,'\nout of ', len(ds_df), '\naccuracy:', correct_num/len(ds_df))
+    correct_id_num = ds_df['correct_id'].value_counts()[True]
+    print('OM2Seq Evaluation:\nnum correct id:\n', correct_id_num ,'\nout of ', len(ds_df), '\naccuracy:', correct_id_num/len(ds_df))
+
 
 
     # dict(y=None, qry_start=int(qry['QryStartPos']), qry_stop=int(qry['QryEndPos']),\

@@ -20,13 +20,17 @@ class Env(BaseSettings):
     BIONANO_IMAGES_DIR: str
     NUM_PROC: int = multiprocessing.cpu_count() - 1
     NUM_THREADS: int = multiprocessing.cpu_count()
+    # NUM_THREADS: int = 1
+    # BNX_FILES: dict = {
+    #     'CTTAAG': ["T1_chip2_channels_swapped.bnx"],
+    #     'GCTCTTC': [
+    #         "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_19_2019_5_36_52_AM_RawMolecules.bnx",
+    #         "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_20_2019_6_47_37_AM_RawMolecules.bnx",
+    #         "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_22_2019_6_50_00_AM_RawMolecules.bnx",
+    #     ]
+    # }
     BNX_FILES: dict = {
-        'CTTAAG': ["T1_chip2_channels_swapped.bnx"],
-        'GCTCTTC': [
-            "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_19_2019_5_36_52_AM_RawMolecules.bnx",
-            "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_20_2019_6_47_37_AM_RawMolecules.bnx",
-            "GM12878_mtaq_ecodam_180319_KXPTQGOLPQHGFNWU_F1P1_3_22_2019_6_50_00_AM_RawMolecules.bnx",
-        ]
+        'CTTAAG': ["S278C_B_--_CAGOIS6NPM37DN6U_--_F1P1_--_2023-07-13T135051.142Z_RawMolecules.bnx"],
     }
     DATASET_PARQUET: str = 'dataset.parquet'
 
@@ -35,9 +39,9 @@ class Env(BaseSettings):
     BNX_FILE: str = BNX_FILES[PATTERN][0]
     XMAP_FILE: str = 'exp_refineFinal1.xmap'
     # human genome - OM2Seq
-    FASTA_FILE: str = 'GCF_000001405.40_GRCh38.p14_genomic.fna'
+    # FASTA_FILE: str = 'GCF_000001405.40_GRCh38.p14_genomic.fna'
     # yiest genome - YOYONet combined with human genome
-    # FASTA_FILE: str = 'combined_S288C_reference_sequence_R64-3-1_20210421_and_GCF_000001405.40_GRCh38.p14_genomic.fna'
+    FASTA_FILE: str = 'combined_S288C_reference_sequence_R64-3-1_20210421_and_GCF_000001405.40_GRCh38.p14_genomic.fna'
     DEEPOM_MODEL_FILE: str = 'src/deepom/deepom.pt'
     BNX_SCALE: float = 375
     NOMINAL_SCALE: float = 320

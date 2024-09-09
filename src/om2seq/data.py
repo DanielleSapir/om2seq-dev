@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 from datasets import Dataset
 from fire import Fire
+import pandas as pd
 from scipy.stats import loguniform
 
 from utils.pyutils import PydanticClass, PydanticClassConfig, PydanticClassInputs
@@ -99,7 +100,9 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
         nominal_scale: float = ENV.NOMINAL_SCALE
         bnx_scale: float = ENV.BNX_SCALE
         # limit - the dataset size
-        limit: int = 100000
+        limit: int = 1
+        # limit: int = 100000
+        # limit: int = 30000
 
     def create_dataset(self):
         with self.wandb_init():
@@ -119,6 +122,11 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
             bnx_record = BNXParser.BNXRecord(**bnx_xmap_record)
             image = self.image_reader.read_image(bnx_record).image
             image = self.image_preprocessor.preprocess_image(image)
+        except Exception as err:
+            if self.config.raise_errors:
+                raise
+            return Error(error=str(err)).model_dump()
+        try:
             return AlignedImage(
                 image=image,
                 **self._align_xmap(
@@ -129,7 +137,9 @@ class AlignedImagesDataset(DatasetTask, ParallelTask):
         except Exception as err:
             if self.config.raise_errors:
                 raise
-            return Error(error=str(err)).model_dump()
+            return Error(error=str(err)).model_dump() | {'image':np.array(image), 'bnx_record':bnx_record,
+                                                        'xmap_record':XMAPParser.XMAPRecord(**bnx_xmap_record)}
+                   
 
     def _align_xmap(self, bnx_record: BNXParser.BNXRecord,
                     xmap_record: XMAPParser.XMAPRecord) -> DeepOMAligner.Alignment:
@@ -225,8 +235,14 @@ class TrainingDataset(data.Dataset, BaseTask):
         self.crops_rng = np.random.default_rng(self.config.crops_seed)
 
         self.training_split = TrainingSplit(limit=self.config.aligned_limit).dataset_dict()
-        self.train_subset = self.training_split['train']
-        # TODO: change aligned_images_dataset to the one I created
+        if ENV.LOCAL_OUT_DIR == 'out/S288C':
+            for subset in ['train', 'eval', 'test']:
+                subset_df = pd.DataFrame(self.training_split[subset])
+                filtered_df = subset_df[subset_df['query_scale'].notnull() & subset_df['reference_id'].notnull() & subset_df['orientation'].notnull() & subset_df['score'].notnull()]
+                filtered_dataset = Dataset.from_pandas(filtered_df)
+                self.training_split[subset] = filtered_dataset
+
+        self.train_subset = self.training_split['train']       
         self.crops_eval_dataset = self.generate_crops_dataset(aligned_images_dataset=self.training_split['eval'])
 
     def generate_crops_dataset(self, aligned_images_dataset: Dataset, qry_len: int = None, limit: int = None):

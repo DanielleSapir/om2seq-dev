@@ -17,7 +17,10 @@ from utils.image_utils import extract_segment_from_endpoints
 class ImageReader:
     class Config(PydanticClassConfig):
         bionano_images_dir: str = ENV.BIONANO_IMAGES_DIR
+        # OM2Seq
         bnx_channel: int = 3
+        # YoyoNet
+        # bnx_channel: int = 2
         fov_size: int = 2048
         segment_width: int = 11
 

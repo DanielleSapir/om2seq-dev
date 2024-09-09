@@ -21,6 +21,7 @@ class MappingResult(PydanticClass):
     qry: QryEmb
     ref: RefEmb
     correct: bool
+    correct_ref_id: bool
     overlap: int
     score: float
 
