@@ -151,7 +151,7 @@ class DatasetTask(BaseTask):
         if self.local_file.exists() or self.cloud_file.exists():
             ds = self.load()
         else:
-            ds = self.create_and_upload()
+            ds = self.create_and_save()
         return ds
 
     def load(self) -> Dataset:
@@ -181,6 +181,8 @@ class DatasetTask(BaseTask):
                     timeout=ENV.GCS_BLOB_TIMEOUT,
                     num_retries=ENV.GCS_BLOB_NUM_RETRIES
                 )
+    
+
 
     def _download(self, cloud_src: AnyPath, local_dst: Path):
         debug(self, cloud_src, local_dst)
