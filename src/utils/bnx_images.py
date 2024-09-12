@@ -9,6 +9,7 @@ from utils.pyutils import PydanticClass, PydanticClassConfig, PydanticClassInput
 
 from utils.env import ENV, joblib_memory
 from utils.bnx_parse import BNXParser
+# TODO: remove the use of any_file_read_bytes
 from utils.gcs_utils import any_file_read_bytes
 from utils.pyutils import NDArray
 from utils.image_utils import extract_segment_from_endpoints
