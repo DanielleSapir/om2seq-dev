@@ -19,7 +19,7 @@ from om2seq.plotting import CropPlot
 from utils.alignment import AlignedImage
 from utils.bnx_images import ImageReader
 from utils.bnx_parse import BNXParser
-# TODO: remove the use of any_file_open
+# Remove the use of any_file_open - should also work for local files
 from utils.gcs_utils import any_file_open
 from utils.genome import GenomePatternMapper
 from utils.dataset_tasks import DatasetTask, ParallelTask, BaseTask

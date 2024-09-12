@@ -13,7 +13,6 @@ from utils.pyutils import PydanticClass, PydanticClassConfig, PydanticClassInput
 from tqdm.auto import tqdm
 
 from om2seq.env import ENV
-# TODO: remove the use of gcs_blob
 from utils.gcs_utils import gcs_blob
 from typing import Optional
 
